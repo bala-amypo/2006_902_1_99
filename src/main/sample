@@ -1,0 +1,1657 @@
+2.
+
+package com.example.demo.config;
+
+import com.example.demo.entity.Role;
+import com.example.demo.entity.User;
+import com.example.demo.repository.RoleRepository;
+import com.example.demo.repository.UserRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import java.util.HashSet;
+import java.util.Set;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+    private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public DataInitializer(RoleRepository roleRepository, UserRepository userRepository, 
+                          PasswordEncoder passwordEncoder) {
+        this.roleRepository = roleRepository;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Override
+    public void run(String... args) {
+        if (roleRepository.findByName("ADMIN").isEmpty()) {
+            roleRepository.save(new Role("ADMIN"));
+        }
+        
+        if (roleRepository.findByName("USER").isEmpty()) {
+            roleRepository.save(new Role("USER"));
+        }
+
+        if (userRepository.findByEmail("admin@example.com").isEmpty()) {
+            Role adminRole = roleRepository.findByName("ADMIN").get();
+            Set<Role> adminRoles = new HashSet<>();
+            adminRoles.add(adminRole);
+            
+            User admin = new User();
+            admin.setName("Admin User");
+            admin.setEmail("admin@example.com");
+            admin.setPassword(passwordEncoder.encode("admin123"));
+            admin.setRoles(adminRoles);
+            userRepository.save(admin);
+        }
+
+        if (userRepository.findByEmail("user@example.com").isEmpty()) {
+            Role userRole = roleRepository.findByName("USER").get();
+            Set<Role> userRoles = new HashSet<>();
+            userRoles.add(userRole);
+            
+            User normalUser = new User();
+            normalUser.setName("Normal User");
+            normalUser.setEmail("user@example.com");
+            normalUser.setPassword(passwordEncoder.encode("user123"));
+            normalUser.setRoles(userRoles);
+            userRepository.save(normalUser);
+        }
+    }
+}
+3.JwtAuthenticationEntryPoint.java
+
+package com.example.demo.config;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+import java.io.IOException;
+
+@Component
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+    @Override
+    public void commence(HttpServletRequest request, HttpServletResponse response,
+                         AuthenticationException authException) throws IOException {
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+    }
+}
+
+4.JwtFilter.java
+
+package com.example.demo.config;
+
+import com.example.demo.util.JwtUtil;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Component
+public class JwtFilter extends OncePerRequestFilter {
+    private final JwtUtil jwtUtil;
+
+    public JwtFilter(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
+                                   FilterChain filterChain) throws ServletException, IOException {
+        String authHeader = request.getHeader("Authorization");
+        
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            
+            if (jwtUtil.validateToken(token)) {
+                String email = jwtUtil.extractEmail(token);
+                Set<String> roles = jwtUtil.extractRoles(token);
+                
+                Set<SimpleGrantedAuthority> authorities = roles.stream()
+                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                        .collect(Collectors.toSet());
+                
+                UsernamePasswordAuthenticationToken authentication = 
+                        new UsernamePasswordAuthenticationToken(email, null, authorities);
+                
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        }
+        
+        filterChain.doFilter(request, response);
+    }
+}
+
+5. SecurityConfig.java
+
+package com.example.demo.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    private final JwtFilter jwtFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    public SecurityConfig(JwtFilter jwtFilter, JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) {
+        this.jwtFilter = jwtFilter;
+        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+
+6. SwaggerConfig
+package com.example.demo.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Asset Lifecycle Management API")
+                        .version("1.0")
+                        .description("API for managing asset lifecycle"))
+                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))
+                .components(new Components()
+                        .addSecuritySchemes("Bearer Authentication",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")));
+    }
+}
+
+Controller(fold)
+1.AssetController.java
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.Asset;
+import com.example.demo.service.AssetService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/assets")
+public class AssetController {
+    private final AssetService assetService;
+
+    public AssetController(AssetService assetService) {
+        this.assetService = assetService; 
+    }
+
+    @PostMapping("/{vendorId}/{ruleId}")
+    public ResponseEntity<Asset> createAsset(@PathVariable Long vendorId, 
+                                           @PathVariable Long ruleId, 
+                                           @RequestBody Asset asset) {
+        Asset createdAsset = assetService.createAsset(vendorId, ruleId, asset);
+        return ResponseEntity.ok(createdAsset);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Asset>> getAllAssets() {
+        List<Asset> assets = assetService.getAllAssets();
+        return ResponseEntity.ok(assets);
+    }
+
+    @GetMapping("/status/{status}")
+    public ResponseEntity<List<Asset>> getAssetsByStatus(@PathVariable String status) {
+        List<Asset> assets = assetService.getAssetsByStatus(status);
+        return ResponseEntity.ok(assets);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Asset> getAsset(@PathVariable Long id) {
+        Asset asset = assetService.getAsset(id);
+        return ResponseEntity.ok(asset);
+    }
+}
+
+2. AssetDisposalController.java
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.AssetDisposal;
+import com.example.demo.service.AssetDisposalService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/disposals")
+public class AssetDisposalController {
+    private final AssetDisposalService disposalService;
+
+    public AssetDisposalController(AssetDisposalService disposalService) {
+        this.disposalService = disposalService;
+    }
+
+    @PostMapping("/request/{assetId}")
+    public ResponseEntity<AssetDisposal> requestDisposal(@PathVariable Long assetId, 
+                                                        @RequestBody AssetDisposal disposal) {
+        AssetDisposal requestedDisposal = disposalService.requestDisposal(assetId, disposal);
+        return ResponseEntity.ok(requestedDisposal);
+    }
+
+    @PutMapping("/approve/{disposalId}/{adminId}")
+    public ResponseEntity<AssetDisposal> approveDisposal(@PathVariable Long disposalId, 
+                                                        @PathVariable Long adminId) {
+        AssetDisposal approvedDisposal = disposalService.approveDisposal(disposalId, adminId);
+        return ResponseEntity.ok(approvedDisposal);
+    }
+}
+
+3. AssetLifecycleEventController.java
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.AssetLifecycleEvent;
+import com.example.demo.service.AssetLifecycleEventService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/events")
+public class AssetLifecycleEventController {
+    private final AssetLifecycleEventService eventService;
+
+    public AssetLifecycleEventController(AssetLifecycleEventService eventService) {
+        this.eventService = eventService;
+    }
+
+    @PostMapping("/{assetId}")
+    public ResponseEntity<AssetLifecycleEvent> logEvent(@PathVariable Long assetId, 
+                                                       @RequestBody AssetLifecycleEvent event) {
+        AssetLifecycleEvent loggedEvent = eventService.logEvent(assetId, event);
+        return ResponseEntity.ok(loggedEvent);
+    }
+
+    @GetMapping("/asset/{assetId}")
+    public ResponseEntity<List<AssetLifecycleEvent>> getEventsForAsset(@PathVariable Long assetId) {
+        List<AssetLifecycleEvent> events = eventService.getEventsForAsset(assetId);
+        return ResponseEntity.ok(events);
+    }
+}
+
+4. AuthController.java
+package com.example.demo.controller;
+
+import com.example.demo.dto.AuthRequest;
+import com.example.demo.dto.AuthResponse;
+import com.example.demo.entity.User;
+import com.example.demo.service.UserService;
+import com.example.demo.util.JwtUtil;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.*;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+    private final UserService userService;
+    private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+
+    public AuthController(UserService userService, JwtUtil jwtUtil, PasswordEncoder passwordEncoder) {
+        this.userService = userService;
+        this.jwtUtil = jwtUtil;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<User> register(@RequestBody User user) {
+        User registeredUser = userService.registerUser(user);
+        return ResponseEntity.ok(registeredUser);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+        User user = userService.findByEmail(request.getEmail());
+        
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(401).build();
+        }
+
+        Set<String> roles = user.getRoles().stream()
+                .map(role -> role.getName())
+                .collect(Collectors.toSet());
+
+        String token = jwtUtil.generateToken(user.getEmail(), user.getId(), roles);
+        
+        AuthResponse response = new AuthResponse(token, user.getId(), user.getEmail(), roles);
+        return ResponseEntity.ok(response);
+    }
+}
+
+5. DepreciationRuleController.java
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.DepreciationRule;
+import com.example.demo.service.DepreciationRuleService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/rules")
+public class DepreciationRuleController {
+    private final DepreciationRuleService depreciationRuleService;
+
+    public DepreciationRuleController(DepreciationRuleService depreciationRuleService) {
+        this.depreciationRuleService = depreciationRuleService;
+    }
+
+    @PostMapping
+    public ResponseEntity<DepreciationRule> createRule(@RequestBody DepreciationRule rule) {
+        DepreciationRule createdRule = depreciationRuleService.createRule(rule);
+        return ResponseEntity.ok(createdRule);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<DepreciationRule>> getAllRules() {
+        List<DepreciationRule> rules = depreciationRuleService.getAllRules();
+        return ResponseEntity.ok(rules);
+    }
+}
+
+6. VendorController.java
+
+package com.example.demo.controller;
+
+import com.example.demo.entity.Vendor;
+import com.example.demo.service.VendorService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/vendors")
+public class VendorController {
+    private final VendorService vendorService;
+
+    public VendorController(VendorService vendorService) {
+        this.vendorService = vendorService;
+    }
+
+    @PostMapping
+    public ResponseEntity<Vendor> createVendor(@RequestBody Vendor vendor) {
+        Vendor createdVendor = vendorService.createVendor(vendor);
+        return ResponseEntity.ok(createdVendor);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Vendor>> getAllVendors() {
+        List<Vendor> vendors = vendorService.getAllVendors();
+        return ResponseEntity.ok(vendors);
+    }
+}
+
+dto(fold)
+
+1.AuthRequest.java
+
+package com.example.demo.dto;
+
+public class AuthRequest {
+    private String email;
+    private String password;
+
+    public AuthRequest() {}
+
+    public AuthRequest(String email, String password) {
+        this.email = email;
+        this.password = password;
+    }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+}
+
+2. AuthResponse.java
+
+package com.example.demo.dto;
+
+import java.util.Set;
+
+public class AuthResponse {
+    private String token;
+    private Long userId;
+    private String email;
+    private Set<String> roles;
+
+    public AuthResponse() {}
+
+    public AuthResponse(String token, Long userId, String email, Set<String> roles) {
+        this.token = token;
+        this.userId = userId;
+        this.email = email;
+        this.roles = roles;
+    }
+
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
+
+    public Long getUserId() { return userId; }
+    public void setUserId(Long userId) { this.userId = userId; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public Set<String> getRoles() { return roles; }
+    public void setRoles(Set<String> roles) { this.roles = roles; }
+}
+
+entity(fold)
+1. Asset.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "assets")
+public class Asset {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String assetTag;
+
+    @Column(nullable = false)
+    private String assetName;
+
+    @ManyToOne
+    @JoinColumn(name = "vendor_id", nullable = false)
+    private Vendor vendor;
+
+    @Column(nullable = false)
+    private LocalDate purchaseDate;
+
+    @Column(nullable = false)
+    private Double purchaseCost;
+
+    @ManyToOne
+    @JoinColumn(name = "depreciation_rule_id", nullable = false)
+    private DepreciationRule depreciationRule;
+
+    @Column(nullable = false)
+    private String status = "ACTIVE";
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "asset", cascade = CascadeType.ALL)
+    private Set<AssetLifecycleEvent> lifecycleEvents = new HashSet<>();
+
+    @OneToOne(mappedBy = "asset")
+    private AssetDisposal disposal;
+
+    public Asset() {}
+
+    public Asset(String assetTag, String assetName, Vendor vendor, LocalDate purchaseDate, 
+                 Double purchaseCost, DepreciationRule depreciationRule) {
+        this.assetTag = assetTag;
+        this.assetName = assetName;
+        this.vendor = vendor;
+        this.purchaseDate = purchaseDate;
+        this.purchaseCost = purchaseCost;
+        this.depreciationRule = depreciationRule;
+        this.status = "ACTIVE";
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        if (status == null) {
+            status = "ACTIVE";
+        }
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getAssetTag() { return assetTag; }
+    public void setAssetTag(String assetTag) { this.assetTag = assetTag; }
+
+    public String getAssetName() { return assetName; }
+    public void setAssetName(String assetName) { this.assetName = assetName; }
+
+    public Vendor getVendor() { return vendor; }
+    public void setVendor(Vendor vendor) { this.vendor = vendor; }
+
+    public LocalDate getPurchaseDate() { return purchaseDate; }
+    public void setPurchaseDate(LocalDate purchaseDate) { this.purchaseDate = purchaseDate; }
+
+    public Double getPurchaseCost() { return purchaseCost; }
+    public void setPurchaseCost(Double purchaseCost) { this.purchaseCost = purchaseCost; }
+
+    public DepreciationRule getDepreciationRule() { return depreciationRule; }
+    public void setDepreciationRule(DepreciationRule depreciationRule) { this.depreciationRule = depreciationRule; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<AssetLifecycleEvent> getLifecycleEvents() { return lifecycleEvents; }
+    public void setLifecycleEvents(Set<AssetLifecycleEvent> lifecycleEvents) { this.lifecycleEvents = lifecycleEvents; }
+
+    public AssetDisposal getDisposal() { return disposal; }
+    public void setDisposal(AssetDisposal disposal) { this.disposal = disposal; }
+}
+2. AssetDisposal.java
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "asset_disposals")
+public class AssetDisposal {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToOne
+    @JoinColumn(name = "asset_id", nullable = false)
+    private Asset asset;
+
+    @Column(nullable = false)
+    private String disposalMethod;
+
+    @Column(nullable = false)
+    private Double disposalValue;
+
+    @Column(nullable = false)
+    private LocalDate disposalDate;
+
+    @ManyToOne
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    public AssetDisposal() {}
+
+    public AssetDisposal(Asset asset, String disposalMethod, Double disposalValue, LocalDate disposalDate, User approvedBy) {
+        this.asset = asset;
+        this.disposalMethod = disposalMethod;
+        this.disposalValue = disposalValue;
+        this.disposalDate = disposalDate;
+        this.approvedBy = approvedBy;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Asset getAsset() { return asset; }
+    public void setAsset(Asset asset) { this.asset = asset; }
+
+    public String getDisposalMethod() { return disposalMethod; }
+    public void setDisposalMethod(String disposalMethod) { this.disposalMethod = disposalMethod; }
+
+    public Double getDisposalValue() { return disposalValue; }
+    public void setDisposalValue(Double disposalValue) { this.disposalValue = disposalValue; }
+
+    public LocalDate getDisposalDate() { return disposalDate; }
+    public void setDisposalDate(LocalDate disposalDate) { this.disposalDate = disposalDate; }
+
+    public User getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+}
+
+3. AssetLifecycleEvent.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "asset_lifecycle_events")
+public class AssetLifecycleEvent {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "asset_id", nullable = false)
+    private Asset asset;
+
+    @Column(nullable = false)
+    private String eventType;
+
+    @Column(nullable = false)
+    private String eventDescription;
+
+    @Column(nullable = false)
+    private LocalDate eventDate;
+
+    @Column(name = "logged_at")
+    private LocalDateTime loggedAt;
+
+    public AssetLifecycleEvent() {}
+
+    public AssetLifecycleEvent(Asset asset, String eventType, String eventDescription, LocalDate eventDate) {
+        this.asset = asset;
+        this.eventType = eventType;
+        this.eventDescription = eventDescription;
+        this.eventDate = eventDate;
+        this.loggedAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        loggedAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public Asset getAsset() { return asset; }
+    public void setAsset(Asset asset) { this.asset = asset; }
+
+    public String getEventType() { return eventType; }
+    public void setEventType(String eventType) { this.eventType = eventType; }
+
+    public String getEventDescription() { return eventDescription; }
+    public void setEventDescription(String eventDescription) { this.eventDescription = eventDescription; }
+
+    public LocalDate getEventDate() { return eventDate; }
+    public void setEventDate(LocalDate eventDate) { this.eventDate = eventDate; }
+
+    public LocalDateTime getLoggedAt() { return loggedAt; }
+    public void setLoggedAt(LocalDateTime loggedAt) { this.loggedAt = loggedAt; }
+}
+
+4. DepreciationRule.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "depreciation_rules")
+public class DepreciationRule {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String ruleName;
+
+    @Column(nullable = false)
+    private String method;
+
+    @Column(nullable = false)
+    private Integer usefulLifeYears;
+
+    @Column(nullable = false)
+    private Double salvageValue;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "depreciationRule")
+    private Set<Asset> assets = new HashSet<>();
+
+    public DepreciationRule() {}
+
+    public DepreciationRule(String ruleName, String method, Integer usefulLifeYears, Double salvageValue) {
+        this.ruleName = ruleName;
+        this.method = method;
+        this.usefulLifeYears = usefulLifeYears;
+        this.salvageValue = salvageValue;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getRuleName() { return ruleName; }
+    public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+    public String getMethod() { return method; }
+    public void setMethod(String method) { this.method = method; }
+
+    public Integer getUsefulLifeYears() { return usefulLifeYears; }
+    public void setUsefulLifeYears(Integer usefulLifeYears) { this.usefulLifeYears = usefulLifeYears; }
+
+    public Double getSalvageValue() { return salvageValue; }
+    public void setSalvageValue(Double salvageValue) { this.salvageValue = salvageValue; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<Asset> getAssets() { return assets; }
+    public void setAssets(Set<Asset> assets) { this.assets = assets; }
+}
+
+5. Role.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "roles")
+public class Role {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    @ManyToMany(mappedBy = "roles")
+    private Set<User> users = new HashSet<>();
+
+    public Role() {}
+
+    public Role(String name) {
+        this.name = name;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public Set<User> getUsers() { return users; }
+    public void setUsers(Set<User> users) { this.users = users; }
+}
+6. User.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles = new HashSet<>();
+
+    @OneToMany(mappedBy = "approvedBy")
+    private Set<AssetDisposal> approvedDisposals = new HashSet<>();
+
+    public User() {}
+
+    public User(String name, String email, String password, Set<Role> roles) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.roles = roles;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<Role> getRoles() { return roles; }
+    public void setRoles(Set<Role> roles) { this.roles = roles; }
+
+    public Set<AssetDisposal> getApprovedDisposals() { return approvedDisposals; }
+    public void setApprovedDisposals(Set<AssetDisposal> approvedDisposals) { this.approvedDisposals = approvedDisposals; }
+}
+
+7. Vendor.java
+
+package com.example.demo.entity;
+
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+
+@Entity
+@Table(name = "vendors")
+public class Vendor {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String vendorName;
+
+    @Column(nullable = false)
+    private String contactEmail;
+
+    private String phone;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "vendor")
+    private Set<Asset> assets = new HashSet<>();
+
+    public Vendor() {}
+
+    public Vendor(String vendorName, String contactEmail, String phone) {
+        this.vendorName = vendorName;
+        this.contactEmail = contactEmail;
+        this.phone = phone;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String vendorName) { this.vendorName = vendorName; }
+
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<Asset> getAssets() { return assets; }
+    public void setAssets(Set<Asset> assets) { this.assets = assets; }
+}
+
+Exception(fold)
+
+1. GlobalExceptionHandler.java
+
+package com.example.demo.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleResourceNotFound(ResourceNotFoundException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, String>> handleGeneral(Exception ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Internal server error");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+    }
+}
+
+2. ResourceNotFoundException.java
+
+package com.example.demo.exception;
+
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
+}
+
+repository(fold)
+
+1. AssetDisposalRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.AssetDisposal;
+import com.example.demo.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface AssetDisposalRepository extends JpaRepository<AssetDisposal, Long> {
+    List<AssetDisposal> findByApprovedBy(User approvedBy);
+}
+
+2. AssetLifecycleEventRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.AssetLifecycleEvent;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface AssetLifecycleEventRepository extends JpaRepository<AssetLifecycleEvent, Long> {
+    List<AssetLifecycleEvent> findByAssetIdOrderByEventDateDesc(Long assetId);
+}
+
+3. AssetRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.Asset;
+import com.example.demo.entity.Vendor;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface AssetRepository extends JpaRepository<Asset, Long> {
+    boolean existsByAssetTag(String assetTag);
+    List<Asset> findByStatus(String status);
+    List<Asset> findByVendor(Vendor vendor);
+}
+
+4. DepreciationRuleRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.DepreciationRule;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface DepreciationRuleRepository extends JpaRepository<DepreciationRule, Long> {
+    Optional<DepreciationRule> findByRuleName(String ruleName);
+}
+
+5. RoleRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.Role;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface RoleRepository extends JpaRepository<Role, Long> {
+    Optional<Role> findByName(String name);
+}
+
+6. UserRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+}
+
+7. VendorRepository.java
+
+package com.example.demo.repository;
+
+import com.example.demo.entity.Vendor;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+import java.util.Optional;
+
+@Repository
+public interface VendorRepository extends JpaRepository<Vendor, Long> {
+    Optional<Vendor> findByVendorName(String vendorName);
+}
+
+service(fold)
+inside
+impl(fold)
+
+1. AssetDisposalServiceImpl.java
+
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.Asset;
+import com.example.demo.entity.AssetDisposal;
+import com.example.demo.entity.Role;
+import com.example.demo.entity.User;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.repository.AssetDisposalRepository;
+import com.example.demo.repository.AssetRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.service.AssetDisposalService;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+
+@Service
+public class AssetDisposalServiceImpl implements AssetDisposalService {
+    private final AssetDisposalRepository disposalRepository;
+    private final AssetRepository assetRepository;
+    private final UserRepository userRepository;
+
+    public AssetDisposalServiceImpl(AssetDisposalRepository disposalRepository, 
+                                   AssetRepository assetRepository, UserRepository userRepository) {
+        this.disposalRepository = disposalRepository;
+        this.assetRepository = assetRepository;
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    public AssetDisposal requestDisposal(Long assetId, AssetDisposal disposal) {
+        Asset asset = assetRepository.findById(assetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
+
+        if (disposal.getDisposalValue() == null || disposal.getDisposalValue() < 0) {
+            throw new IllegalArgumentException("Disposal value must be greater than or equal to 0");
+        }
+
+        disposal.setAsset(asset);
+        disposal.setCreatedAt(LocalDateTime.now());
+        return disposalRepository.save(disposal);
+    }
+
+    @Override
+    public AssetDisposal approveDisposal(Long disposalId, Long adminId) {
+        AssetDisposal disposal = disposalRepository.findById(disposalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Disposal not found"));
+
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        boolean isAdmin = admin.getRoles().stream()
+                .anyMatch(role -> "ADMIN".equals(role.getName()));
+        
+        if (!isAdmin) {
+            throw new IllegalArgumentException("User must have ADMIN role");
+        }
+
+        disposal.setApprovedBy(admin);
+        
+        Asset asset = disposal.getAsset();
+        asset.setStatus("DISPOSED");
+        assetRepository.save(asset);
+        
+        return disposalRepository.save(disposal);
+    }
+}
+
+2. AssetLifecycleEventServiceImpl.java
+
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.Asset;
+import com.example.demo.entity.AssetLifecycleEvent;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.repository.AssetLifecycleEventRepository;
+import com.example.demo.repository.AssetRepository;
+import com.example.demo.service.AssetLifecycleEventService;
+import org.springframework.stereotype.Service;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class AssetLifecycleEventServiceImpl implements AssetLifecycleEventService {
+    private final AssetLifecycleEventRepository eventRepository;
+    private final AssetRepository assetRepository;
+
+    public AssetLifecycleEventServiceImpl(AssetLifecycleEventRepository eventRepository, AssetRepository assetRepository) {
+        this.eventRepository = eventRepository;
+        this.assetRepository = assetRepository;
+    }
+
+    @Override
+    public AssetLifecycleEvent logEvent(Long assetId, AssetLifecycleEvent event) {
+        Asset asset = assetRepository.findById(assetId)
+                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
+
+        if (event.getEventType() == null || event.getEventType().trim().isEmpty()) {
+            throw new IllegalArgumentException("Event type is required");
+        }
+
+        if (event.getEventDescription() == null || event.getEventDescription().trim().isEmpty()) {
+            throw new IllegalArgumentException("Event description must not be blank");
+        }
+
+        if (event.getEventDate() != null && event.getEventDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Event date must not be in the future");
+        }
+
+        event.setAsset(asset);
+        event.setLoggedAt(LocalDateTime.now());
+        return eventRepository.save(event);
+    }
+
+    @Override
+    public List<AssetLifecycleEvent> getEventsForAsset(Long assetId) {
+        if (!assetRepository.existsById(assetId)) {
+            throw new ResourceNotFoundException("Asset not found");
+        }
+        return eventRepository.findByAssetIdOrderByEventDateDesc(assetId);
+    }
+}
+
+3. AssetServiceImpl.java
+
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.Asset;
+import com.example.demo.entity.DepreciationRule;
+import com.example.demo.entity.Vendor;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.repository.AssetRepository;
+import com.example.demo.repository.DepreciationRuleRepository;
+import com.example.demo.repository.VendorRepository;
+import com.example.demo.service.AssetService;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class AssetServiceImpl implements AssetService {
+    private final AssetRepository assetRepository;
+    private final VendorRepository vendorRepository;
+    private final DepreciationRuleRepository depreciationRuleRepository;
+
+    public AssetServiceImpl(AssetRepository assetRepository, VendorRepository vendorRepository, 
+                           DepreciationRuleRepository depreciationRuleRepository) {
+        this.assetRepository = assetRepository;
+        this.vendorRepository = vendorRepository;
+        this.depreciationRuleRepository = depreciationRuleRepository;
+    }
+
+    @Override
+    public Asset createAsset(Long vendorId, Long ruleId, Asset asset) {
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found"));
+        
+        DepreciationRule rule = depreciationRuleRepository.findById(ruleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Depreciation rule not found"));
+
+        if (asset.getPurchaseCost() == null || asset.getPurchaseCost() <= 0) {
+            throw new IllegalArgumentException("Purchase cost must be greater than 0");
+        }
+
+        if (assetRepository.existsByAssetTag(asset.getAssetTag())) {
+            throw new IllegalArgumentException("Asset tag already exists");
+        }
+
+        asset.setVendor(vendor);
+        asset.setDepreciationRule(rule);
+        asset.setStatus("ACTIVE");
+        asset.setCreatedAt(LocalDateTime.now());
+
+        return assetRepository.save(asset);
+    }
+
+    @Override
+    public List<Asset> getAssetsByStatus(String status) {
+        return assetRepository.findByStatus(status);
+    }
+
+    @Override
+    public List<Asset> getAllAssets() {
+        return assetRepository.findAll();
+    }
+
+    @Override
+    public Asset getAsset(Long id) {
+        return assetRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
+    }
+}
+
+4. DepreciationRuleServiceImpl.java
+
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.DepreciationRule;
+import com.example.demo.repository.DepreciationRuleRepository;
+import com.example.demo.service.DepreciationRuleService;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class DepreciationRuleServiceImpl implements DepreciationRuleService {
+    private final DepreciationRuleRepository depreciationRuleRepository;
+
+    public DepreciationRuleServiceImpl(DepreciationRuleRepository depreciationRuleRepository) {
+        this.depreciationRuleRepository = depreciationRuleRepository;
+    }
+
+    @Override
+    public DepreciationRule createRule(DepreciationRule rule) {
+        if (rule.getUsefulLifeYears() == null || rule.getUsefulLifeYears() <= 0) {
+            throw new IllegalArgumentException("Useful life years must be greater than 0");
+        }
+
+        if (rule.getSalvageValue() == null || rule.getSalvageValue() < 0) {
+            throw new IllegalArgumentException("Salvage value must be greater than or equal to 0");
+        }
+
+        if (!"STRAIGHT_LINE".equals(rule.getMethod()) && !"DECLINING_BALANCE".equals(rule.getMethod())) {
+            throw new IllegalArgumentException("Method must be STRAIGHT_LINE or DECLINING_BALANCE");
+        }
+
+        rule.setCreatedAt(LocalDateTime.now());
+        return depreciationRuleRepository.save(rule);
+    }
+
+    @Override
+    public List<DepreciationRule> getAllRules() {
+        return depreciationRuleRepository.findAll();
+    }
+}
+
+5. UserServiceImpl.java
+
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.Role;
+import com.example.demo.entity.User;
+import com.example.demo.exception.ResourceNotFoundException;
+import com.example.demo.repository.RoleRepository;
+import com.example.demo.repository.UserRepository;
+import com.example.demo.service.UserService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import java.util.HashSet;
+import java.util.Set;
+
+@Service
+public class UserServiceImpl implements UserService {
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserServiceImpl(UserRepository userRepository, RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Override
+    public User registerUser(User user) {
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+        
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            Role userRole = roleRepository.findByName("USER")
+                    .orElseThrow(() -> new ResourceNotFoundException("USER role not found"));
+            Set<Role> roles = new HashSet<>();
+            roles.add(userRole);
+            user.setRoles(roles);
+        }
+        
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    @Override
+    public User findById(Long id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+}
+
+6. VendorServiceImpl.java
+package com.example.demo.service.impl;
+
+import com.example.demo.entity.Vendor;
+import com.example.demo.repository.VendorRepository;
+import com.example.demo.service.VendorService;
+import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.regex.Pattern;
+
+@Service
+public class VendorServiceImpl implements VendorService {
+    private final VendorRepository vendorRepository;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@(.+)$");
+
+    public VendorServiceImpl(VendorRepository vendorRepository) {
+        this.vendorRepository = vendorRepository;
+    }
+
+    @Override
+    public Vendor createVendor(Vendor vendor) {
+        if (vendorRepository.findByVendorName(vendor.getVendorName()).isPresent()) {
+            throw new IllegalArgumentException("Vendor name already exists");
+        }
+
+        if (!EMAIL_PATTERN.matcher(vendor.getContactEmail()).matches()) {
+            throw new IllegalArgumentException("Invalid email format");
+        }
+
+        vendor.setCreatedAt(LocalDateTime.now());
+        return vendorRepository.save(vendor);
+    }
+
+    @Override
+    public List<Vendor> getAllVendors() {
+        return vendorRepository.findAll();
+    }
+}
+
+7. AssetDisposalService.java
+
+package com.example.demo.service;
+
+import com.example.demo.entity.AssetDisposal;
+
+public interface AssetDisposalService {
+    AssetDisposal requestDisposal(Long assetId, AssetDisposal disposal);
+    AssetDisposal approveDisposal(Long disposalId, Long adminId);
+}
+
+8. AssetLifecycleEventService.java
+package com.example.demo.service;
+
+import com.example.demo.entity.AssetLifecycleEvent;
+import java.util.List;
+
+public interface AssetLifecycleEventService {
+    AssetLifecycleEvent logEvent(Long assetId, AssetLifecycleEvent event);
+    List<AssetLifecycleEvent> getEventsForAsset(Long assetId);
+}
+
+9. AssetService.java
+
+package com.example.demo.service;
+
+import com.example.demo.entity.Asset;
+import java.util.List;
+
+public interface AssetService {
+    Asset createAsset(Long vendorId, Long ruleId, Asset asset);
+    List<Asset> getAssetsByStatus(String status);
+    List<Asset> getAllAssets();
+    Asset getAsset(Long id);
+}
+
+10. DepreciationRuleService.java
+
+package com.example.demo.service;
+
+import com.example.demo.entity.DepreciationRule;
+import java.util.List;
+
+public interface DepreciationRuleService {
+    DepreciationRule createRule(DepreciationRule rule);
+    List<DepreciationRule> getAllRules();
+}
+
+11. UserService.java
+
+package com.example.demo.service;
+
+import com.example.demo.entity.User;
+
+public interface UserService {
+    User registerUser(User user);
+    User findByEmail(String email);
+    User findById(Long id);
+}
+
+12. VendorService.java
+
+package com.example.demo.service;
+
+import com.example.demo.entity.Vendor;
+import java.util.List;
+
+public interface VendorService {
+    Vendor createVendor(Vendor vendor);
+    List<Vendor> getAllVendors();
+}
+
+util(fold)
+
+1. JwtUtil.java
+
+package com.example.demo.util;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.stereotype.Component;
+import java.security.Key;
+import java.util.Date;
+import java.util.Set;
+
+@Component
+public class JwtUtil {
+    private final String SECRET = "mySecretKeymySecretKeymySecretKeymySecretKey";
+    private final int EXPIRATION = 86400000; // 24 hours
+
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(SECRET.getBytes());
+    }
+
+    public String generateToken(String email, Long userId, Set<String> roles) {
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("userId", userId)
+                .claim("roles", roles)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public Claims extractClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    public String extractEmail(String token) {
+        return extractClaims(token).getSubject();
+    }
+
+    public Long extractUserId(String token) {
+        return extractClaims(token).get("userId", Long.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    public Set<String> extractRoles(String token) {
+        return (Set<String>) extractClaims(token).get("roles");
+    }
+
+    public boolean isTokenExpired(String token) {
+        return extractClaims(token).getExpiration().before(new Date());
+    }
+
+    public boolean validateToken(String token) {
+        try {
+            extractClaims(token);
+            return !isTokenExpired(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+}
+1.DemoApplication.java(inside java) single file
+package com.example.demo;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(DemoApplication.class, args);
+    }
+}
+
+Resource(inside)static (fold)
+1.Application.properties
+spring.application.name=demo
+
+# Database Configuration
+spring.datasource.url=jdbc:mysql://localhost:3306/assetdb?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+spring.datasource.driverClassName=com.mysql.cj.jdbc.Driver
+spring.datasource.username=root
+spring.datasource.password=password
+
+# JPA Configuration
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+
+# Swagger Configuration
+springdoc.api-docs.path=/v3/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+
+
+
