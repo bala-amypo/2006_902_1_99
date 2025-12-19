@@ -5,88 +5,9 @@
 Controller:
 
 
-package com.example.demo.controller;
 
-import com.example.demo.entity.DepreciationRule;
-import com.example.demo.service.DepreciationRuleService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/rules")
-public class DepreciationRuleController {
-    private final DepreciationRuleService depreciationRuleService;
-
-    public DepreciationRuleController(DepreciationRuleService depreciationRuleService) {
-        this.depreciationRuleService = depreciationRuleService;
-    }
-
-    @PostMapping
-    public ResponseEntity<DepreciationRule> createRule(@RequestBody DepreciationRule rule) {
-        DepreciationRule createdRule = depreciationRuleService.createRule(rule);
-        return ResponseEntity.ok(createdRule);
-    }
-
-    @GetMapping
-    public ResponseEntity<List<DepreciationRule>> getAllRules() {
-        List<DepreciationRule> rules = depreciationRuleService.getAllRules();
-        return ResponseEntity.ok(rules);
-    }
-}
-
-6. package com.example.demo.controller;
-
-import com.example.demo.entity.Vendor;
-import com.example.demo.service.VendorService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
-
-@RestController
-@RequestMapping("/api/vendors")
-public class VendorController {
-    private final VendorService vendorService;
-
-    public VendorController(VendorService vendorService) {
-        this.vendorService = vendorService;
-    }
-
-    @PostMapping
-    public ResponseEntity<Vendor> createVendor(@RequestBody Vendor vendor) {
-        Vendor createdVendor = vendorService.createVendor(vendor);
-        return ResponseEntity.ok(createdVendor);
-    }
-
-    @GetMapping
-    public ResponseEntity<List<Vendor>> getAllVendors() {
-        List<Vendor> vendors = vendorService.getAllVendors();
-        return ResponseEntity.ok(vendors);
-    }
-}
 Dto:
-
-1. package com.example.demo.dto;
-
-public class AuthRequest {
-    private String email;
-    private String password;
-
-    public AuthRequest() {}
-
-    public AuthRequest(String email, String password) {
-        this.email = email;
-        this.password = password;
-    }
-
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-}
-
-2. package com.example.demo.dto;
+package com.example.demo.dto;
 
 import java.util.Set;
 
