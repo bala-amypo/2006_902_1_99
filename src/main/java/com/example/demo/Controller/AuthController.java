@@ -8,43 +8,58 @@ import com.example.demo.util.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
+
     private final UserService userService;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
 
-    public AuthController(UserService userService, JwtUtil jwtUtil, PasswordEncoder passwordEncoder) {
+    public AuthController(UserService userService,
+                          JwtUtil jwtUtil,
+                          PasswordEncoder passwordEncoder) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user) {
-        User registeredUser = userService.registerUser(user);
-        return ResponseEntity.ok(registeredUser);
+    public ResponseEntity<AuthResponse> register(@RequestBody User user) {
+        User saved = userService.registerUser(user);
+
+        Set<String> roles = saved.getRoles().stream()
+                .map(r -> r.getName())
+                .collect(Collectors.toSet());
+
+        String token = jwtUtil.generateToken(saved.getEmail(), saved.getId(), roles);
+
+        return ResponseEntity.ok(
+                new AuthResponse(token, saved.getId(), saved.getEmail(), roles)
+        );
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+
         User user = userService.findByEmail(request.getEmail());
-        
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            return ResponseEntity.status(401).build();
+            throw new IllegalArgumentException("Invalid credentials");
         }
 
         Set<String> roles = user.getRoles().stream()
-                .map(role -> role.getName())
+                .map(r -> r.getName())
                 .collect(Collectors.toSet());
 
         String token = jwtUtil.generateToken(user.getEmail(), user.getId(), roles);
-        
-        AuthResponse response = new AuthResponse(token, user.getId(), user.getEmail(), roles);
-        return ResponseEntity.ok(response);
+
+        return ResponseEntity.ok(
+                new AuthResponse(token, user.getId(), user.getEmail(), roles)
+        );
     }
 }
