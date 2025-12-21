@@ -4,11 +4,13 @@ import com.example.demo.entity.DepreciationRule;
 import com.example.demo.repository.DepreciationRuleRepository;
 import com.example.demo.service.DepreciationRuleService;
 import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class DepreciationRuleServiceImpl implements DepreciationRuleService {
+
     private final DepreciationRuleRepository depreciationRuleRepository;
 
     public DepreciationRuleServiceImpl(DepreciationRuleRepository depreciationRuleRepository) {
@@ -16,25 +18,31 @@ public class DepreciationRuleServiceImpl implements DepreciationRuleService {
     }
 
     @Override
-public DepreciationRule createRule(DepreciationRule rule) {
+    public DepreciationRule createRule(DepreciationRule rule) {
 
-    if (depreciationRuleRepository.findByRuleName(rule.getRuleName()).isPresent()) {
-        throw new IllegalArgumentException("Rule name already exists");
+        if (depreciationRuleRepository.findByRuleName(rule.getRuleName()).isPresent()) {
+            throw new IllegalArgumentException("Rule name already exists");
+        }
+
+        if (rule.getUsefulLifeYears() == null || rule.getUsefulLifeYears() <= 0) {
+            throw new IllegalArgumentException("Useful life years must be greater than 0");
+        }
+
+        if (rule.getSalvageValue() == null || rule.getSalvageValue() < 0) {
+            throw new IllegalArgumentException("Salvage value must be >= 0");
+        }
+
+        if (!"STRAIGHT_LINE".equals(rule.getMethod())
+                && !"DECLINING_BALANCE".equals(rule.getMethod())) {
+            throw new IllegalArgumentException("Invalid depreciation method");
+        }
+
+        rule.setCreatedAt(LocalDateTime.now());
+        return depreciationRuleRepository.save(rule);
     }
 
-    if (rule.getUsefulLifeYears() == null || rule.getUsefulLifeYears() <= 0) {
-        throw new IllegalArgumentException("Useful life years must be greater than 0");
+    @Override
+    public List<DepreciationRule> getAllRules() {
+        return depreciationRuleRepository.findAll();
     }
-
-    if (rule.getSalvageValue() == null || rule.getSalvageValue() < 0) {
-        throw new IllegalArgumentException("Salvage value must be >= 0");
-    }
-
-    if (!"STRAIGHT_LINE".equals(rule.getMethod())
-            && !"DECLINING_BALANCE".equals(rule.getMethod())) {
-        throw new IllegalArgumentException("Invalid depreciation method");
-    }
-
-    rule.setCreatedAt(java.time.LocalDateTime.now());
-    return depreciationRuleRepository.save(rule);
 }
