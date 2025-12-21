@@ -13,12 +13,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-    private final JwtFilter jwtFilter;
-    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    public SecurityConfig(JwtFilter jwtFilter, JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) {
+    private final JwtFilter jwtFilter;
+    private final JwtAuthenticationEntryPoint entryPoint;
+
+    public SecurityConfig(JwtFilter jwtFilter,
+                          JwtAuthenticationEntryPoint entryPoint) {
         this.jwtFilter = jwtFilter;
-        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
+        this.entryPoint = entryPoint;
     }
 
     @Bean
@@ -28,16 +30,25 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+        http
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**").permitAll()
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/**").authenticated()
-                .anyRequest().authenticated()
+                    .requestMatchers("/auth/**",
+                                     "/swagger-ui/**",
+                                     "/v3/api-docs/**")
+                    .permitAll()
+                    .requestMatchers("/api/**")
+                    .authenticated()
+                    .anyRequest()
+                    .authenticated()
             )
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .exceptionHandling(ex ->
+                    ex.authenticationEntryPoint(entryPoint))
+            .addFilterBefore(jwtFilter,
+                    UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
