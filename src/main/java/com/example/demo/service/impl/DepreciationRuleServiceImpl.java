@@ -16,25 +16,25 @@ public class DepreciationRuleServiceImpl implements DepreciationRuleService {
     }
 
     @Override
-    public DepreciationRule createRule(DepreciationRule rule) {
-        if (rule.getUsefulLifeYears() == null || rule.getUsefulLifeYears() <= 0) {
-            throw new IllegalArgumentException("Useful life years must be greater than 0");
-        }
+public DepreciationRule createRule(DepreciationRule rule) {
 
-        if (rule.getSalvageValue() == null || rule.getSalvageValue() < 0) {
-            throw new IllegalArgumentException("Salvage value must be greater than or equal to 0");
-        }
-
-        if (!"STRAIGHT_LINE".equals(rule.getMethod()) && !"DECLINING_BALANCE".equals(rule.getMethod())) {
-            throw new IllegalArgumentException("Method must be STRAIGHT_LINE or DECLINING_BALANCE");
-        }
-
-        rule.setCreatedAt(LocalDateTime.now());
-        return depreciationRuleRepository.save(rule);
+    if (depreciationRuleRepository.findByRuleName(rule.getRuleName()).isPresent()) {
+        throw new IllegalArgumentException("Rule name already exists");
     }
 
-    @Override
-    public List<DepreciationRule> getAllRules() {
-        return depreciationRuleRepository.findAll();
+    if (rule.getUsefulLifeYears() == null || rule.getUsefulLifeYears() <= 0) {
+        throw new IllegalArgumentException("Useful life years must be greater than 0");
     }
+
+    if (rule.getSalvageValue() == null || rule.getSalvageValue() < 0) {
+        throw new IllegalArgumentException("Salvage value must be >= 0");
+    }
+
+    if (!"STRAIGHT_LINE".equals(rule.getMethod())
+            && !"DECLINING_BALANCE".equals(rule.getMethod())) {
+        throw new IllegalArgumentException("Invalid depreciation method");
+    }
+
+    rule.setCreatedAt(java.time.LocalDateTime.now());
+    return depreciationRuleRepository.save(rule);
 }
