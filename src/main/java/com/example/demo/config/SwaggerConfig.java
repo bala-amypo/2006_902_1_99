@@ -15,7 +15,7 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .addServersItem(new Server().url("https://9021.408procr.amypo.ai"))
+                .addServersItem(new Server().url("https://9021.408procr.amypo.ai/"))
                 .info(new Info()
                         .title("Asset Lifecycle Management API")
                         .version("1.0")
