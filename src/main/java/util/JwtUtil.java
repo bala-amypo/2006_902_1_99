@@ -1,15 +1,18 @@
 package com.example.demo.util;
 
 import io.jsonwebtoken.*;
+import org.springframework.stereotype.Component;
+
 import java.util.*;
 
+@Component
 public class JwtUtil {
 
-    public String generateToken(
-            String email,
-            Long userId,
-            List<String> roles,
-            String secret) {
+    // SAME SECRET USED EVERYWHERE
+    private static final String SECRET = "demo_secret_key_123";
+
+    // ================== GENERATE TOKEN ==================
+    public String generateToken(String email, Long userId, Set<String> roles) {
 
         Map<String, Object> claims = new HashMap<>();
         claims.put("email", email);
@@ -20,14 +23,30 @@ public class JwtUtil {
                 .setClaims(claims)
                 .setSubject(email)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
-                .signWith(SignatureAlgorithm.HS256, secret)
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 24))
+                .signWith(SignatureAlgorithm.HS256, SECRET)
                 .compact();
     }
 
-    public Claims extractAllClaims(String token, String secret) {
+    // ================== VALIDATE TOKEN ==================
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(SECRET).parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ================== EXTRACT EMAIL ==================
+    public String extractEmail(String token) {
+        return getClaims(token).getSubject();
+    }
+
+    // ================== EXTRACT CLAIMS ==================
+    public Claims getClaims(String token) {
         return Jwts.parser()
-                .setSigningKey(secret)
+                .setSigningKey(SECRET)
                 .parseClaimsJws(token)
                 .getBody();
     }
