@@ -1,4 +1,4 @@
-package com.example.demo.security;
+package com.example.demo.util;
 
 import io.jsonwebtoken.*;
 import java.util.*;
@@ -23,5 +23,12 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + 86400000))
                 .signWith(SignatureAlgorithm.HS256, secret)
                 .compact();
+    }
+
+    public Claims extractAllClaims(String token, String secret) {
+        return Jwts.parser()
+                .setSigningKey(secret)
+                .parseClaimsJws(token)
+                .getBody();
     }
 }

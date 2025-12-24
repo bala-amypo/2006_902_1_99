@@ -2,10 +2,10 @@ package com.example.demo.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
-    name = "depreciation_rules",
     uniqueConstraints = @UniqueConstraint(columnNames = "ruleName")
 )
 public class DepreciationRule {
@@ -27,5 +27,28 @@ public class DepreciationRule {
     @PositiveOrZero
     private double salvageValue;
 
-    // getters & setters
+    private LocalDateTime createdAt;
+
+    public Long getId() { return id; }
+
+    public String getRuleName() { return ruleName; }
+    public void setRuleName(String ruleName) { this.ruleName = ruleName; }
+
+    public String getMethod() { return method; }
+    public void setMethod(String method) { this.method = method; }
+
+    public int getUsefulLifeYears() { return usefulLifeYears; }
+    public void setUsefulLifeYears(int usefulLifeYears) {
+        this.usefulLifeYears = usefulLifeYears;
+    }
+
+    public double getSalvageValue() { return salvageValue; }
+    public void setSalvageValue(double salvageValue) {
+        this.salvageValue = salvageValue;
+    }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

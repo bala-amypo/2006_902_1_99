@@ -2,10 +2,10 @@ package com.example.demo.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
-    name = "vendors",
     uniqueConstraints = @UniqueConstraint(columnNames = "vendorName")
 )
 public class Vendor {
@@ -22,5 +22,16 @@ public class Vendor {
     @NotBlank
     private String contactEmail;
 
-    // getters & setters
+    private LocalDateTime createdAt;
+
+    public Long getId() { return id; }
+
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String vendorName) { this.vendorName = vendorName; }
+
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
