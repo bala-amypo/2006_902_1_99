@@ -8,10 +8,20 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final JwtFilter jwtFilter;
+    private final JwtAuthenticationEntryPoint entryPoint;
+
+    public SecurityConfig(JwtFilter jwtFilter,
+                          JwtAuthenticationEntryPoint entryPoint) {
+        this.jwtFilter = jwtFilter;
+        this.entryPoint = entryPoint;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -20,12 +30,23 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
+
+        http.csrf(csrf -> csrf.disable())
+            .sessionManagement(session ->
+                    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .anyRequest().permitAll()
+                    .requestMatchers(
+                            "/auth/**",
+                            "/swagger-ui/**",
+                            "/swagger-ui.html",
+                            "/v3/api-docs/**",
+                            "/v3/api-docs"
+                    ).permitAll()
+                    .requestMatchers("/api/**").authenticated()
+                    .anyRequest().authenticated()
             )
-            .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(entryPoint))
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
