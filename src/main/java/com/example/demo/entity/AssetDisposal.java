@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "asset_disposals")
 public class AssetDisposal {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -28,19 +29,7 @@ public class AssetDisposal {
     @JoinColumn(name = "approved_by")
     private User approvedBy;
 
-    @Column(name = "created_at")
     private LocalDateTime createdAt;
-
-    public AssetDisposal() {}
-
-    public AssetDisposal(Asset asset, String disposalMethod, Double disposalValue, LocalDate disposalDate, User approvedBy) {
-        this.asset = asset;
-        this.disposalMethod = disposalMethod;
-        this.disposalValue = disposalValue;
-        this.disposalDate = disposalDate;
-        this.approvedBy = approvedBy;
-        this.createdAt = LocalDateTime.now();
-    }
 
     @PrePersist
     protected void onCreate() {
@@ -48,7 +37,6 @@ public class AssetDisposal {
     }
 
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
 
     public Asset getAsset() { return asset; }
     public void setAsset(Asset asset) { this.asset = asset; }
@@ -66,5 +54,4 @@ public class AssetDisposal {
     public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
