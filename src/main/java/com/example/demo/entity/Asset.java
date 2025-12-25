@@ -9,7 +9,6 @@ import java.util.Set;
 @Entity
 @Table(name = "assets")
 public class Asset {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -24,18 +23,20 @@ public class Asset {
     @JoinColumn(name = "vendor_id", nullable = false)
     private Vendor vendor;
 
-    @ManyToOne
-    @JoinColumn(name = "depreciation_rule_id", nullable = false)
-    private DepreciationRule depreciationRule;
-
     @Column(nullable = false)
     private LocalDate purchaseDate;
 
     @Column(nullable = false)
     private Double purchaseCost;
 
+    @ManyToOne
+    @JoinColumn(name = "depreciation_rule_id", nullable = false)
+    private DepreciationRule depreciationRule;
+
+    @Column(nullable = false)
     private String status = "ACTIVE";
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "asset", cascade = CascadeType.ALL)
@@ -44,27 +45,58 @@ public class Asset {
     @OneToOne(mappedBy = "asset")
     private AssetDisposal disposal;
 
+    public Asset() {}
+
+    public Asset(String assetTag, String assetName, Vendor vendor, LocalDate purchaseDate, 
+                 Double purchaseCost, DepreciationRule depreciationRule) {
+        this.assetTag = assetTag;
+        this.assetName = assetName;
+        this.vendor = vendor;
+        this.purchaseDate = purchaseDate;
+        this.purchaseCost = purchaseCost;
+        this.depreciationRule = depreciationRule;
+        this.status = "ACTIVE";
+        this.createdAt = LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        if (this.status == null) this.status = "ACTIVE";
+        createdAt = LocalDateTime.now();
+        if (status == null) {
+            status = "ACTIVE";
+        }
     }
 
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
     public String getAssetTag() { return assetTag; }
     public void setAssetTag(String assetTag) { this.assetTag = assetTag; }
+
     public String getAssetName() { return assetName; }
     public void setAssetName(String assetName) { this.assetName = assetName; }
+
     public Vendor getVendor() { return vendor; }
     public void setVendor(Vendor vendor) { this.vendor = vendor; }
-    public DepreciationRule getDepreciationRule() { return depreciationRule; }
-    public void setDepreciationRule(DepreciationRule depreciationRule) { this.depreciationRule = depreciationRule; }
+
     public LocalDate getPurchaseDate() { return purchaseDate; }
     public void setPurchaseDate(LocalDate purchaseDate) { this.purchaseDate = purchaseDate; }
+
     public Double getPurchaseCost() { return purchaseCost; }
     public void setPurchaseCost(Double purchaseCost) { this.purchaseCost = purchaseCost; }
+
+    public DepreciationRule getDepreciationRule() { return depreciationRule; }
+    public void setDepreciationRule(DepreciationRule depreciationRule) { this.depreciationRule = depreciationRule; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<AssetLifecycleEvent> getLifecycleEvents() { return lifecycleEvents; }
+    public void setLifecycleEvents(Set<AssetLifecycleEvent> lifecycleEvents) { this.lifecycleEvents = lifecycleEvents; }
+
+    public AssetDisposal getDisposal() { return disposal; }
+    public void setDisposal(AssetDisposal disposal) { this.disposal = disposal; }
 }
