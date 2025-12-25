@@ -1,28 +1,35 @@
 package com.example.demo.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
-@Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = "vendorName")
-)
+@Table(name = "vendors")
 public class Vendor {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
     @Column(nullable = false, unique = true)
     private String vendorName;
 
-    @Email
-    @NotBlank
+    @Column(nullable = false)
     private String contactEmail;
 
+    private String phone;
+
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "vendor")
+    private Set<Asset> assets = new HashSet<>();
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 
     public Long getId() { return id; }
 
@@ -32,6 +39,10 @@ public class Vendor {
     public String getContactEmail() { return contactEmail; }
     public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
 
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Set<Asset> getAssets() { return assets; }
 }

@@ -1,46 +1,53 @@
 package com.example.demo.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
+@Table(name = "depreciation_rules")
 public class DepreciationRule {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
-    private Double rate;
+    @Column(nullable = false, unique = true)
+    private String ruleName;
 
-    public DepreciationRule() {
+    @Column(nullable = false)
+    private String method;
+
+    @Column(nullable = false)
+    private Integer usefulLifeYears;
+
+    @Column(nullable = false)
+    private Double salvageValue;
+
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "depreciationRule")
+    private Set<Asset> assets = new HashSet<>();
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
     }
 
-    public DepreciationRule(String name, Double rate) {
-        this.name = name;
-        this.rate = rate;
-    }
+    public Long getId() { return id; }
 
-    public Long getId() {
-        return id;
-    }
+    public String getRuleName() { return ruleName; }
+    public void setRuleName(String ruleName) { this.ruleName = ruleName; }
 
-    public String getName() {
-        return name;
-    }
+    public String getMethod() { return method; }
+    public void setMethod(String method) { this.method = method; }
 
-    public Double getRate() {
-        return rate;
-    }
+    public Integer getUsefulLifeYears() { return usefulLifeYears; }
+    public void setUsefulLifeYears(Integer usefulLifeYears) { this.usefulLifeYears = usefulLifeYears; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+    public Double getSalvageValue() { return salvageValue; }
+    public void setSalvageValue(Double salvageValue) { this.salvageValue = salvageValue; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setRate(Double rate) {
-        this.rate = rate;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 }
