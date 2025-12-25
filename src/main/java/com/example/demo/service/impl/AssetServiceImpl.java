@@ -1,57 +1,44 @@
 package com.example.demo.service.impl;
 
-import com.example.demo.entity.Asset;
-import com.example.demo.entity.DepreciationRule;
-import com.example.demo.entity.Vendor;
-import com.example.demo.exception.ResourceNotFoundException;
-import com.example.demo.repository.AssetRepository;
-import com.example.demo.repository.DepreciationRuleRepository;
-import com.example.demo.repository.VendorRepository;
+import com.example.demo.entity.*;
+import com.example.demo.repository.*;
 import com.example.demo.service.AssetService;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
-import java.time.LocalDateTime;
+
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@Transactional
 public class AssetServiceImpl implements AssetService {
+
     private final AssetRepository assetRepository;
     private final VendorRepository vendorRepository;
-    private final DepreciationRuleRepository depreciationRuleRepository;
+    private final DepreciationRuleRepository ruleRepository;
 
-    public AssetServiceImpl(AssetRepository assetRepository, VendorRepository vendorRepository, 
-                           DepreciationRuleRepository depreciationRuleRepository) {
+    public AssetServiceImpl(AssetRepository assetRepository,
+                            VendorRepository vendorRepository,
+                            DepreciationRuleRepository ruleRepository) {
         this.assetRepository = assetRepository;
         this.vendorRepository = vendorRepository;
-        this.depreciationRuleRepository = depreciationRuleRepository;
+        this.ruleRepository = ruleRepository;
     }
 
     @Override
     public Asset createAsset(Long vendorId, Long ruleId, Asset asset) {
-        Vendor vendor = vendorRepository.findById(vendorId)
-                .orElseThrow(() -> new ResourceNotFoundException("Vendor not found"));
-        
-        DepreciationRule rule = depreciationRuleRepository.findById(ruleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Depreciation rule not found"));
-
-        if (asset.getPurchaseCost() == null || asset.getPurchaseCost() <= 0) {
-            throw new IllegalArgumentException("Purchase cost must be greater than 0");
+        if (asset.getPurchaseCost() < 0) {
+            throw new IllegalArgumentException("Invalid cost");
         }
 
-        if (assetRepository.existsByAssetTag(asset.getAssetTag())) {
-            throw new IllegalArgumentException("Asset tag already exists");
-        }
+        Vendor v = vendorRepository.findById(vendorId).orElseThrow();
+        DepreciationRule r = ruleRepository.findById(ruleId).orElseThrow();
 
-        asset.setVendor(vendor);
-        asset.setDepreciationRule(rule);
+        asset.setVendor(v);
+        asset.setDepreciationRule(r);
         asset.setStatus("ACTIVE");
-        asset.setCreatedAt(LocalDateTime.now());
 
         return assetRepository.save(asset);
-    }
-
-    @Override
-    public List<Asset> getAssetsByStatus(String status) {
-        return assetRepository.findByStatus(status);
     }
 
     @Override
@@ -61,7 +48,11 @@ public class AssetServiceImpl implements AssetService {
 
     @Override
     public Asset getAsset(Long id) {
-        return assetRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
+        return assetRepository.findById(id).orElseThrow();
+    }
+
+    @Override
+    public List<Asset> getAssetsByStatus(String status) {
+        return assetRepository.findByStatus(status);
     }
 }

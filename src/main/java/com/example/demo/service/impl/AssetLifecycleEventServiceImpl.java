@@ -1,64 +1,40 @@
 package com.example.demo.service.impl;
 
-import com.example.demo.entity.Asset;
-import com.example.demo.entity.AssetLifecycleEvent;
-import com.example.demo.exception.ResourceNotFoundException;
-import com.example.demo.repository.AssetLifecycleEventRepository;
-import com.example.demo.repository.AssetRepository;
+import com.example.demo.entity.*;
+import com.example.demo.repository.*;
 import com.example.demo.service.AssetLifecycleEventService;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@Transactional
 public class AssetLifecycleEventServiceImpl implements AssetLifecycleEventService {
 
-    private final AssetLifecycleEventRepository eventRepository;
+    private final AssetLifecycleEventRepository repo;
     private final AssetRepository assetRepository;
 
-    public AssetLifecycleEventServiceImpl(AssetLifecycleEventRepository eventRepository,
+    public AssetLifecycleEventServiceImpl(AssetLifecycleEventRepository repo,
                                           AssetRepository assetRepository) {
-        this.eventRepository = eventRepository;
+        this.repo = repo;
         this.assetRepository = assetRepository;
     }
 
     @Override
     public AssetLifecycleEvent logEvent(Long assetId, AssetLifecycleEvent event) {
-
-        Asset asset = assetRepository.findById(assetId)
-                .orElseThrow(() -> new ResourceNotFoundException("Asset not found"));
-
-        if (event.getEventType() == null || event.getEventType().isBlank()) {
-            throw new IllegalArgumentException("Event type is required");
-        }
-
-        if (event.getEventDescription() == null || event.getEventDescription().isBlank()) {
-            throw new IllegalArgumentException("Event description must not be blank");
-        }
-
-        if (event.getEventDate() == null) {
-            throw new IllegalArgumentException("Event date is required");
-        }
-
         if (event.getEventDate().isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("Event date must not be in the future");
+            throw new IllegalArgumentException("Future date");
         }
 
+        Asset asset = assetRepository.findById(assetId).orElseThrow();
         event.setAsset(asset);
-        event.setLoggedAt(LocalDateTime.now());
-
-        return eventRepository.save(event);
+        return repo.save(event);
     }
 
     @Override
     public List<AssetLifecycleEvent> getEventsForAsset(Long assetId) {
-
-        if (!assetRepository.existsById(assetId)) {
-            throw new ResourceNotFoundException("Asset not found");
-        }
-
-        return eventRepository.findByAssetIdOrderByEventDateDesc(assetId);
+        return repo.findByAssetIdOrderByEventDateDesc(assetId);
     }
 }
