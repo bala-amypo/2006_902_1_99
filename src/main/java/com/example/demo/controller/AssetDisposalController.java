@@ -8,26 +8,23 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/disposals")
 public class AssetDisposalController {
+    private final AssetDisposalService disposalService;
 
-    private final AssetDisposalService service;
-
-    public AssetDisposalController(AssetDisposalService service) {
-        this.service = service;
+    public AssetDisposalController(AssetDisposalService disposalService) {
+        this.disposalService = disposalService;
     }
 
     @PostMapping("/request/{assetId}")
-    public ResponseEntity<AssetDisposal> requestDisposal(
-            @PathVariable Long assetId,
-            @RequestBody AssetDisposal disposal) {
-
-        return ResponseEntity.ok(service.requestDisposal(assetId, disposal));
+    public ResponseEntity<AssetDisposal> requestDisposal(@PathVariable Long assetId, 
+                                                        @RequestBody AssetDisposal disposal) {
+        AssetDisposal requestedDisposal = disposalService.requestDisposal(assetId, disposal);
+        return ResponseEntity.ok(requestedDisposal);
     }
 
     @PutMapping("/approve/{disposalId}/{adminId}")
-    public ResponseEntity<AssetDisposal> approveDisposal(
-            @PathVariable Long disposalId,
-            @PathVariable Long adminId) {
-
-        return ResponseEntity.ok(service.approveDisposal(disposalId, adminId));
+    public ResponseEntity<AssetDisposal> approveDisposal(@PathVariable Long disposalId, 
+                                                        @PathVariable Long adminId) {
+        AssetDisposal approvedDisposal = disposalService.approveDisposal(disposalId, adminId);
+        return ResponseEntity.ok(approvedDisposal);
     }
 }
