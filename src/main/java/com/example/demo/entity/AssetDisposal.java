@@ -16,13 +16,8 @@ public class AssetDisposal {
     @JoinColumn(name = "asset_id", nullable = false)
     private Asset asset;
 
-    @Column(nullable = false)
     private String disposalMethod;
-
-    @Column(nullable = false)
     private Double disposalValue;
-
-    @Column(nullable = false)
     private LocalDate disposalDate;
 
     @ManyToOne
@@ -33,25 +28,20 @@ public class AssetDisposal {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
-
     public Asset getAsset() { return asset; }
     public void setAsset(Asset asset) { this.asset = asset; }
-
     public String getDisposalMethod() { return disposalMethod; }
     public void setDisposalMethod(String disposalMethod) { this.disposalMethod = disposalMethod; }
-
     public Double getDisposalValue() { return disposalValue; }
     public void setDisposalValue(Double disposalValue) { this.disposalValue = disposalValue; }
-
     public LocalDate getDisposalDate() { return disposalDate; }
     public void setDisposalDate(LocalDate disposalDate) { this.disposalDate = disposalDate; }
-
     public User getApprovedBy() { return approvedBy; }
     public void setApprovedBy(User approvedBy) { this.approvedBy = approvedBy; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

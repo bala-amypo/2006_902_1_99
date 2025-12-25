@@ -20,7 +20,6 @@ public class Vendor {
     private String contactEmail;
 
     private String phone;
-
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "vendor")
@@ -28,21 +27,16 @@ public class Vendor {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
-
     public String getVendorName() { return vendorName; }
     public void setVendorName(String vendorName) { this.vendorName = vendorName; }
-
     public String getContactEmail() { return contactEmail; }
     public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
-
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
-
-    public Set<Asset> getAssets() { return assets; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
