@@ -8,6 +8,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "assets")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 public class Asset {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

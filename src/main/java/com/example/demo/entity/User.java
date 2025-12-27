@@ -7,8 +7,8 @@ import java.util.Set;
 
 @Entity
 @Table(name = "users")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,6 +22,7 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @ManyToMany(fetch = FetchType.EAGER)
@@ -35,12 +36,21 @@ public class User {
     @OneToMany(mappedBy = "approvedBy")
     private Set<AssetDisposal> approvedDisposals = new HashSet<>();
 
+    public User() {}
+
+    public User(String name, String email, String password, Set<Role> roles) {
+        this.name = name;
+        this.email = email;
+        this.password = password;
+        this.roles = roles;
+        this.createdAt = LocalDateTime.now();
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
 
-    // Getters & Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -54,9 +64,11 @@ public class User {
     public void setPassword(String password) { this.password = password; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public Set<Role> getRoles() { return roles; }
     public void setRoles(Set<Role> roles) { this.roles = roles; }
 
     public Set<AssetDisposal> getApprovedDisposals() { return approvedDisposals; }
+    public void setApprovedDisposals(Set<AssetDisposal> approvedDisposals) { this.approvedDisposals = approvedDisposals; }
 }
