@@ -104,11 +104,8 @@
         <artifactId>testng</artifactId>
         <version>7.8.0</version>
         <scope>test</scope>
-    </dependency> -->
-
-
+    </dependency>
 </dependencies>
-
 
 	<build>
 		<plugins>
