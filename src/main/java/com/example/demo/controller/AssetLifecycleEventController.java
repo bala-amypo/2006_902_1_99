@@ -1,27 +1,15 @@
-package com.example.demo.entity;
-import jakarta.persistence.*;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+package com.example.demo.controller;
+import com.example.demo.entity.AssetLifecycleEvent;
+import com.example.demo.service.AssetLifecycleEventService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-@Entity @Table(name = "asset_lifecycle_events")
-public class AssetLifecycleEvent {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
-    @ManyToOne private Asset asset;
-    private String eventType;
-    private String eventDescription;
-    private LocalDate eventDate;
-    private LocalDateTime loggedAt;
-    public AssetLifecycleEvent() {}
-    @PrePersist public void prePersist() { this.loggedAt = LocalDateTime.now(); }
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Asset getAsset() { return asset; }
-    public void setAsset(Asset asset) { this.asset = asset; }
-    public String getEventType() { return eventType; }
-    public void setEventType(String eventType) { this.eventType = eventType; }
-    public String getEventDescription() { return eventDescription; }
-    public void setEventDescription(String eventDescription) { this.eventDescription = eventDescription; }
-    public LocalDate getEventDate() { return eventDate; }
-    public void setEventDate(LocalDate eventDate) { this.eventDate = eventDate; }
-    public LocalDateTime getLoggedAt() { return loggedAt; }
+@RestController @RequestMapping("/api/events")
+public class AssetLifecycleEventController {
+    private final AssetLifecycleEventService service;
+    public AssetLifecycleEventController(AssetLifecycleEventService service) { this.service = service; }
+    @PostMapping("/{assetId}") public ResponseEntity<AssetLifecycleEvent> create(@PathVariable Long assetId, @RequestBody AssetLifecycleEvent event) {
+        return ResponseEntity.ok(service.logEvent(assetId, event));
+    }
+    @GetMapping("/asset/{assetId}") public ResponseEntity<?> getByAsset(@PathVariable Long assetId) { return ResponseEntity.ok(service.getEvents(assetId)); }
 }
