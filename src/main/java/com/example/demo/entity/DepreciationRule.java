@@ -7,6 +7,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "depreciation_rules")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 public class DepreciationRule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
