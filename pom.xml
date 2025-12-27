@@ -71,12 +71,12 @@
         <scope>runtime</scope>
     </dependency>
 
-    <!-- Swagger / OpenAPI -->
+    <!-- Swagger / OpenAPI
     <dependency>
         <groupId>org.springdoc</groupId>
         <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         <version>2.5.0</version>
-    </dependency>
+    </dependency> -->
 
     <!-- H2 Database -->
     <dependency>
@@ -92,7 +92,7 @@
         <scope>runtime</scope>
     </dependency>
 
-    <!-- Testing -->
+    <!-- Testing
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-test</artifactId>
@@ -104,12 +104,40 @@
         <artifactId>testng</artifactId>
         <version>7.8.0</version>
         <scope>test</scope>
-    </dependency>
+    </dependency> -->
+
+    <!-- TEST DEPENDENCIES -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+    <exclusions>
+        <exclusion>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+
+<dependency>
+    <groupId>org.testng</groupId>
+    <artifactId>testng</artifactId>
+    <version>7.9.0</version>
+    <scope>test</scope>
+</dependency>
+
+<!-- SWAGGER -->
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.5.0</version>
+</dependency>
+
 
 </dependencies>
 
 
-	<build>
+	<!-- <build>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -128,7 +156,23 @@
 				</dependencies>
 			</plugin>
 		</plugins>
-	</build>
+	</build> -->
+
+    <build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.2.5</version>
+            <configuration>
+                <suiteXmlFiles>
+                    <suiteXmlFile>src/test/resources/testng.xml</suiteXmlFile>
+                </suiteXmlFiles>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+
 
 
 </project>
