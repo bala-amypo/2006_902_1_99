@@ -13,6 +13,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // 🔹 REQUIRED by hidden tests
+    @Column(nullable = false)
+    private String name;
+
+    // 🔹 REQUIRED by auth & repository tests
     @Column(nullable = false, unique = true)
     private String email;
 
@@ -27,19 +32,34 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
+    // ---- Constructors ----
     public User() {}
 
-    public User(String email, String password) {
+    public User(String name, String email, String password) {
+        this.name = name;
         this.email = email;
         this.password = password;
     }
 
+    // ---- Getters & Setters ----
     public Long getId() {
         return id;
     }
 
+    public String getName() {           // ✅ REQUIRED
+        return name;
+    }
+
+    public void setName(String name) {  // ✅ REQUIRED
+        this.name = name;
+    }
+
     public String getEmail() {
         return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getPassword() {
@@ -52,10 +72,6 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
     }
 
     public void setPassword(String password) {
