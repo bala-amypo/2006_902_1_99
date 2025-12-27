@@ -9,8 +9,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.Set;
-
 @Configuration
 public class DataInitializer {
 
@@ -22,7 +20,7 @@ public class DataInitializer {
     ) {
         return args -> {
 
-            // ---- ROLES ----
+            // ----- ROLES -----
             Role adminRole = roleRepository
                     .findByName("ROLE_ADMIN")
                     .orElseGet(() -> roleRepository.save(new Role("ROLE_ADMIN")));
@@ -31,25 +29,23 @@ public class DataInitializer {
                     .findByName("ROLE_USER")
                     .orElseGet(() -> roleRepository.save(new Role("ROLE_USER")));
 
-            // ---- ADMIN USER ----
-            if (!userRepository.existsByEmail("admin@example.com")) {
+            // ----- ADMIN USER -----
+            if (!userRepository.existsByEmail("admin@test.com")) {
                 User admin = new User();
+                admin.setEmail("admin@test.com");
                 admin.setName("Admin");
-                admin.setEmail("admin@example.com");
                 admin.setPassword(passwordEncoder.encode("admin123"));
-                admin.setRoles(Set.of(adminRole));
-
+                admin.getRoles().add(adminRole);
                 userRepository.save(admin);
             }
 
-            // ---- NORMAL USER ----
-            if (!userRepository.existsByEmail("user@example.com")) {
+            // ----- NORMAL USER -----
+            if (!userRepository.existsByEmail("user@test.com")) {
                 User user = new User();
+                user.setEmail("user@test.com");
                 user.setName("User");
-                user.setEmail("user@example.com");
                 user.setPassword(passwordEncoder.encode("user123"));
-                user.setRoles(Set.of(userRole));
-
+                user.getRoles().add(userRole);
                 userRepository.save(user);
             }
         };
