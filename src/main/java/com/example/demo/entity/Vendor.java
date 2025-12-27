@@ -2,8 +2,6 @@ package com.example.demo.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "vendors")
@@ -13,45 +11,36 @@ public class Vendor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "vendor_name", nullable = false, unique = true)
     private String vendorName;
 
-    @Column(nullable = false)
+    @Column(name = "contact_email", nullable = false)
     private String contactEmail;
 
-    private String phone;
-
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @OneToMany(mappedBy = "vendor", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Asset> assets = new HashSet<>();
+    public Vendor() {}
 
-    // ✅ REQUIRED by JPA & hidden tests
-    public Vendor() {
-    }
-
-    // Optional convenience constructor
     public Vendor(String vendorName, String contactEmail) {
         this.vendorName = vendorName;
         this.contactEmail = contactEmail;
+        this.createdAt = LocalDateTime.now();
     }
 
-    // Automatically set when entity is first saved
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
     }
 
-    // ✅ REQUIRED BY TESTS
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    // -------- Getters & Setters --------
+    // ===== GETTERS & SETTERS =====
 
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getVendorName() {
@@ -70,28 +59,11 @@ public class Vendor {
         this.contactEmail = contactEmail;
     }
 
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    // Tests sometimes set this manually
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public Set<Asset> getAssets() {
-        return assets;
-    }
-
-    public void setAssets(Set<Asset> assets) {
-        this.assets = assets;
     }
 }
