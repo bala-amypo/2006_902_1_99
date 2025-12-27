@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "vendors")
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 public class Vendor {
 
     @Id
