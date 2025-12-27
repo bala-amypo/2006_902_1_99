@@ -29,18 +29,18 @@ public class SecurityConfig {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    // ✅ REQUIRED BY TESTS
+    // ✅ PASSWORD ENCODER
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ SECURITY RULES MATCH TEST EXPECTATIONS
+    // ✅ SECURITY RULES
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.disable()) // disable CSRF for simplicity
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                         "/auth/**",
