@@ -1,69 +1,29 @@
-package com.example.demo.entity;
+package com.example.demo.controller;
 
-import jakarta.persistence.*;
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import com.example.demo.entity.DepreciationRule;
+import com.example.demo.service.DepreciationRuleService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
-@Entity
-@Table(name = "depreciation_rules")
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-public class DepreciationRule {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@RestController
+@RequestMapping("/api/rules")
+public class DepreciationRuleController {
+    private final DepreciationRuleService depreciationRuleService;
 
-    @Column(nullable = false, unique = true)
-    private String ruleName;
-
-    @Column(nullable = false)
-    private String method;
-
-    @Column(nullable = false)
-    private Integer usefulLifeYears;
-
-    @Column(nullable = false)
-    private Double salvageValue;
-
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @OneToMany(mappedBy = "depreciationRule")
-    private Set<Asset> assets = new HashSet<>();
-
-    public DepreciationRule() {}
-
-    public DepreciationRule(String ruleName, String method, Integer usefulLifeYears, Double salvageValue) {
-        this.ruleName = ruleName;
-        this.method = method;
-        this.usefulLifeYears = usefulLifeYears;
-        this.salvageValue = salvageValue;
-        this.createdAt = LocalDateTime.now();
+    public DepreciationRuleController(DepreciationRuleService depreciationRuleService) {
+        this.depreciationRuleService = depreciationRuleService;
     }
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
+    @PostMapping
+    public ResponseEntity<DepreciationRule> createRule(@RequestBody DepreciationRule rule) {
+        DepreciationRule createdRule = depreciationRuleService.createRule(rule);
+        return ResponseEntity.ok(createdRule);
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getRuleName() { return ruleName; }
-    public void setRuleName(String ruleName) { this.ruleName = ruleName; }
-
-    public String getMethod() { return method; }
-    public void setMethod(String method) { this.method = method; }
-
-    public Integer getUsefulLifeYears() { return usefulLifeYears; }
-    public void setUsefulLifeYears(Integer usefulLifeYears) { this.usefulLifeYears = usefulLifeYears; }
-
-    public Double getSalvageValue() { return salvageValue; }
-    public void setSalvageValue(Double salvageValue) { this.salvageValue = salvageValue; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
-    public Set<Asset> getAssets() { return assets; }
-    public void setAssets(Set<Asset> assets) { this.assets = assets; }
+    @GetMapping
+    public ResponseEntity<List<DepreciationRule>> getAllRules() {
+        List<DepreciationRule> rules = depreciationRuleService.getAllRules();
+        return ResponseEntity.ok(rules);
+    }
 }
