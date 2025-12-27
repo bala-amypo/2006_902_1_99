@@ -22,38 +22,34 @@ public class DataInitializer {
     ) {
         return args -> {
 
-            // -------- ROLES --------
-            Role adminRole = roleRepository.findByName("ROLE_ADMIN")
-                    .orElseGet(() -> {
-                        Role r = new Role();
-                        r.setName("ROLE_ADMIN");
-                        return roleRepository.save(r);
-                    });
+            // ---- ROLES ----
+            Role adminRole = roleRepository
+                    .findByName("ROLE_ADMIN")
+                    .orElseGet(() -> roleRepository.save(new Role("ROLE_ADMIN")));
 
-            Role userRole = roleRepository.findByName("ROLE_USER")
-                    .orElseGet(() -> {
-                        Role r = new Role();
-                        r.setName("ROLE_USER");
-                        return roleRepository.save(r);
-                    });
+            Role userRole = roleRepository
+                    .findByName("ROLE_USER")
+                    .orElseGet(() -> roleRepository.save(new Role("ROLE_USER")));
 
-            // -------- ADMIN USER --------
+            // ---- ADMIN USER ----
             if (!userRepository.existsByEmail("admin@example.com")) {
                 User admin = new User();
-                admin.setName("Admin"); // 🔴 REQUIRED by hidden test
+                admin.setName("Admin");
                 admin.setEmail("admin@example.com");
                 admin.setPassword(passwordEncoder.encode("admin123"));
                 admin.setRoles(Set.of(adminRole));
+
                 userRepository.save(admin);
             }
 
-            // -------- NORMAL USER --------
+            // ---- NORMAL USER ----
             if (!userRepository.existsByEmail("user@example.com")) {
                 User user = new User();
-                user.setName("User"); // 🔴 REQUIRED by hidden test
+                user.setName("User");
                 user.setEmail("user@example.com");
                 user.setPassword(passwordEncoder.encode("user123"));
                 user.setRoles(Set.of(userRole));
+
                 userRepository.save(user);
             }
         };
